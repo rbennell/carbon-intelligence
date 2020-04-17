@@ -12,6 +12,7 @@ services:
       - "./src:/code"
     environment:
       - DATABASE_URL=postgres://postgres:carbonfreecontainer@db/postgres
+      - PYTHONUNBUFFERED=1
     # command: python manage.py runserver 0.0.0.0:8000
     entrypoint: "/code/docker-entrypoint.sh"
     depends_on:
