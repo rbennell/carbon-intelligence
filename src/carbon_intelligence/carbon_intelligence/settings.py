@@ -76,8 +76,10 @@ WSGI_APPLICATION = "carbon_intelligence.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
+        "NAME": "postgres",
+        "USER": "postgres",
         "PASSWORD": "carbonfreecontainer",
-        "HOST": "http://db",
+        "HOST": "db",
         "PORT": "5432",
     }
 }

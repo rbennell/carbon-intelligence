@@ -10,8 +10,12 @@ services:
     volumes:
       - "./data:/data"
       - "./src:/code"
-
-    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      - DATABASE_URL=postgres://postgres:carbonfreecontainer@db/postgres
+    # command: python manage.py runserver 0.0.0.0:8000
+    entrypoint: "/code/docker-entrypoint.sh"
+    depends_on:
+      - db
 
   db:
     image: postgres
@@ -22,4 +26,6 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_PASSWORD: carbonfreecontainer
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=carbonfreecontainer
