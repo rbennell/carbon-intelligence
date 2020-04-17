@@ -1,0 +1,17 @@
+version: "3"
+
+services:
+  web:
+    build: .
+
+    ports:
+      - "5000:5000"
+    working_dir: /code/carbon_intelligence
+
+    command: python manage.py runserver 0.0.0.0:8000
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: carbonfreecontainer
