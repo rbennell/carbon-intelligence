@@ -13,3 +13,5 @@ You can use the data in /data directory.
 The data must be uploaded in the following order- building_data.csv, halfhourly_data.csv, meter_data.csv. This is due to foreign key dependencies within the database.
 
 Once this is done, you can browse through the data from localhost:8000/buildings/. From there on in it should be self explanatory!
+
+You can toggle which meters to display by clicking on the colour indicators in the key underneath each graph.
