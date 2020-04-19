@@ -47,7 +47,6 @@ def show_building(request, building_id):
 
 
 def get_meter_filters(request):
-    print("doing this")
     filters = {}
     meter_ids = request.GET.get("meter_ids")
     if meter_ids:

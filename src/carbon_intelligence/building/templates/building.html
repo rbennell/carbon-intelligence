@@ -205,7 +205,6 @@
         }
         clonedData = Object.assign({}, data[fuel]);
         excludes[fuel].forEach((key) => delete clonedData[key]);
-        console.log(clonedData);
         const totals = d3
           .nest()
           .key((reading) => reading.datetime)

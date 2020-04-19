@@ -12,7 +12,6 @@ def upload(request):
                 save_data(form.cleaned_data["file"])
             except Exception as e:
                 error = e
-                print(e)
     else:
         form = UploadForm()
     return render(request, "upload.html", {"error": error, "form": form})
