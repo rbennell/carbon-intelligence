@@ -19,14 +19,12 @@ from django.urls import include, path
 
 from building.views import show_buildings, show_building
 
-from meter.views import show_meter
 from portal.views import upload
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("buildings/", show_buildings, name="show_buildings"),
     path("buildings/<int:building_id>/meters", show_building, name="show_building"),
-    path("meter/<int:meter_id>", show_meter, name="show_meter"),
     path("upload/", upload, name="upload"),
 ]
 
