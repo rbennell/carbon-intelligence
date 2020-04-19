@@ -3,12 +3,16 @@ from .forms import UploadForm
 from .process_csv import save_data
 
 
-def upload_view(request):
-    print("hello")
+def upload(request):
+    error = ""
     if request.method == "POST":
         form = UploadForm(request.POST, request.FILES)
         if form.is_valid():
-            save_data(form.cleaned_data["file"])
+            try:
+                save_data(form.cleaned_data["file"])
+            except Exception as e:
+                error = e
+                print(e)
     else:
         form = UploadForm()
-    return render(request, "upload.html", {"form": form})
+    return render(request, "upload.html", {"error": error, "form": form})

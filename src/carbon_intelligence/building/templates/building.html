@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h3>
+      <a href="{% url 'show_buildings' %}">buildings</a> > {{building.name}}
+      (id: {{building.id}})
+    </h3>
+    <div id="charts"></div>
+  </body>
+
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  {{ meter_readings|json_script:"meter-data" }}
+  <script>
+    // Callback activated when we click to toggle which lines in the chart are visible.
+    // Reinitialises the charts.
+    const toggleInclude = (fuel, id) => {
+      const fuelIncludes = excludes[fuel];
+      if (fuelIncludes.includes(id)) {
+        fuelIncludes.pop(fuelIncludes.indexOf(id));
+      } else {
+        fuelIncludes.push(id);
+      }
+      const includeTotals = !fuelIncludes.includes("Totals");
+
+      const data = prepareData(parsedData, includeTotals);
+      buildCharts(data);
+    };
+
+    /**
+     * Basic function for generating the same colours every time it's used,
+     * based on the offset value provided.
+     */
+    const pickColour = (offset) => {
+      return `rgb(
+        ${(100 * offset) % 255},
+        ${(50 * offset) % 255},
+        ${(200 * (offset + 1)) % 255}
+      )`;
+    };
+
+    /**
+     * Adds a div to the dom, and to that appends an svg chart based on the data from the meters.
+     */
+    const chart = (fuel, width, height, meters, meterNames) => {
+      const container = d3
+        .select("div#charts")
+        .append("div")
+        .attr(
+          "style",
+          "width: 90%; height:630px; overflow-x:scroll; overflow-y: hidden;"
+        );
+      const svg = container
+        .append("svg")
+        .attr("height", "630px")
+        .attr("width", `${width}px`);
+
+      const x_data = Array.from(
+        new Set(
+          Object.values(meters).reduce(
+            (cumulative, meter) =>
+              cumulative.concat(meter.map(({ datetime }) => datetime)),
+            []
+          )
+        )
+      );
+
+      const x = d3
+        .scaleUtc()
+        .domain(d3.extent(x_data))
+        .range([margin.left, width - margin.right]);
+
+      const y = d3
+        .scaleLinear()
+        .domain([
+          0,
+          d3.max(
+            meters.reduce((cumulative, meter) => cumulative.concat(meter), []),
+            (d) => d.value
+          ),
+        ])
+        .nice()
+        .range([height - margin.bottom, margin.top]);
+
+      const xAxis = (g) =>
+        g
+          .attr("transform", `translate(0,${height - margin.bottom})`)
+          .call(d3.axisBottom(x).ticks(d3.utcHour.every(3)).tickSizeOuter(0));
+
+      const topXAxis = (g) =>
+        g
+          .attr("transform", `translate(0,${margin.top})`)
+          .call(d3.axisTop(x).ticks(d3.utcDay).tickSizeOuter(0));
+
+      const unit = fuel === "Water" ? "m3" : "kWh";
+
+      const yAxis = (g) =>
+        g
+          .attr("transform", `translate(${margin.left},0)`)
+          .call(d3.axisLeft(y))
+          .call((g) => g.select(".domain").remove())
+          .call((g) =>
+            g
+              .select(".tick:last-of-type text")
+              .clone()
+              .attr("x", 3)
+              .attr("y", 10)
+              .attr("text-anchor", "start")
+              .attr("font-weight", "bold")
+              .text(`${unit} consumption`)
+          );
+
+      svg.append("g").call(topXAxis);
+      svg.append("g").call(xAxis);
+      svg.append("g").call(yAxis);
+
+      meters.forEach((meter, index) => {
+        // We don't filter meters out with no data, so that index for colour is retained.
+        // However, if there is no data, continue through the loop at this point.
+        if (!meter.length) {
+          return;
+        }
+        const line = d3
+          .line()
+          .defined((d) => !isNaN(d.value))
+          .x((d) => x(d.datetime))
+          .y((d) => y(d.value));
+
+        const colour = pickColour(index);
+        svg
+          .append("path")
+          .datum(meter)
+          .attr("fill", "none")
+          .attr("stroke", colour)
+          .attr("stroke-width", 1.5)
+          .attr("stroke-linejoin", "round")
+          .attr("stroke-linecap", "round")
+          .attr("d", line);
+
+        [
+          ["mean", [5, 5]],
+          ["max", [1, 1]],
+          ["min", [1, 1]],
+        ].forEach(([funcName, style]) => {
+          const func = d3[funcName];
+          const value = y(func(meter.map(({ value }) => value)));
+          svg
+            .append("svg:line")
+            .attr("x1", 0)
+            .attr("x2", width)
+            .attr("y1", value)
+            .attr("y2", value)
+            .style("stroke", colour)
+            .style("stroke-dasharray", style);
+        });
+      });
+
+      meterNames.forEach((meterId, index) => {
+        const colour = pickColour(index);
+        const legendHeight = height - 2;
+        svg
+          .append("circle")
+          .attr("cx", 200 + 150 * index)
+          .attr("cy", legendHeight)
+          .attr("r", 6)
+          .style("fill", colour)
+          .on("click", () => toggleInclude(fuel, meterId));
+        svg
+          .append("text")
+          .attr("x", 220 + 150 * index)
+          .attr("y", legendHeight + 4)
+          .text(meterId)
+          .style("font-size", "12px")
+          .attr("alignment-baseline", "middle");
+      });
+
+      return svg;
+    };
+
+    /**
+     * Convert the parsed json data in to something we can use with d3. At
+     * this point, we also filter out any meters that have been excluded using
+     * the on click events.
+     */
+    const prepareData = (data, includeTotals = true) => {
+      const out = {};
+      Object.entries(data).forEach(([fuel, meters]) => {
+        out[fuel] = Object.entries(meters).map(([meter_id, readings]) =>
+          excludes[fuel].includes(meter_id)
+            ? []
+            : readings.map(({ consumption, datetime }) => ({
+                datetime: Date.parse(datetime),
+                value: consumption,
+              }))
+        );
+      });
+
+      Object.keys(out).forEach((fuel) => {
+        const meters = out[fuel];
+        if (
+          !includeTotals ||
+          (meters.length &&
+            meters.filter((meter) => Boolean(meter.length)).length < 2)
+        ) {
+          return;
+        }
+        clonedData = Object.assign({}, data[fuel]);
+        excludes[fuel].forEach((key) => delete clonedData[key]);
+        console.log(clonedData);
+        const totals = d3
+          .nest()
+          .key((reading) => reading.datetime)
+          .rollup((readings) =>
+            d3.sum(readings.map((reading) => reading.consumption))
+          )
+          .entries(Object.values(clonedData).flat())
+          .map(({ key, value }) => ({ datetime: Date.parse(key), value }));
+        out[fuel].push(totals);
+      });
+
+      return out;
+    };
+
+    const buildChart = (preparedData, fuel) => {
+      // All the meters for this fuel
+      const meters = preparedData[fuel];
+
+      // If there aren't any meters at all, don't bother plotting a chart.
+      // However, do plot a chart if the meters are present, but have no data.
+      // We do this so that the toggle buttons are not lost if all graphs are toggled off.
+      if (!Object.keys(meters).length) {
+        console.warn(`no data for ${fuel}; so skipping`);
+        return;
+      }
+      const header = d3.select("div#charts").append("h2").html(fuel);
+
+      // Since our prepared data does not contain any name data, refer to the original parsed data.
+      const meterNames = Object.keys(parsedData[fuel]);
+
+      // Only include a totals option if more than one of the meters had data to begin with.
+      if (
+        Object.values(parsedData[fuel]).filter((meter) => Boolean(meter.length))
+          .length > 1
+      ) {
+        meterNames.push("Totals");
+      }
+      chart(fuel, width, height, meters, meterNames);
+    };
+
+    const buildCharts = (preparedData) => {
+      // clean the dom
+      d3.select("div#charts").selectAll("*").remove();
+      // Build a new chart for each fuel type.
+      ["Electricity", "Natural Gas", "Water"].forEach((fuel) => {
+        buildChart(preparedData, fuel);
+      });
+    };
+
+    // init routine
+
+    // initialise object directing which data to exclude
+    const excludes = { Electricity: [], "Natural Gas": [], Water: [] };
+
+    // parse the data passed through by django in to the template, from a json
+    // script in to a usable object.
+    const parsedData = JSON.parse(
+      document.getElementById("meter-data").textContent
+    );
+
+    // convert the data in to something d3 will work with.
+    const preparedData = prepareData(parsedData);
+
+    /**
+     * Calculate the maximum number of data points used; base the width value
+     * on this.
+     */
+    const mostDataPoints = d3.max(
+      Object.values(preparedData).map((fuel) =>
+        d3.max(fuel.map((meter) => meter.length))
+      )
+    );
+
+    // chart styles.
+    const height = 600;
+    const width = mostDataPoints * 10;
+    const margin = { top: 20, right: 30, bottom: 30, left: 40 };
+
+    buildCharts(preparedData);
+  </script>
+</html>

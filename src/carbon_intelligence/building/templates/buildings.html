@@ -1,0 +1,15 @@
+<body>
+  <h1>Buildings</h1>
+  {% for building in buildings%}
+  <h3><a href="{% url 'show_building' building.id %}">{{building.name}}</a></h3>
+  <ul>
+    {% for meter in building.meter_set.all %}
+    <li>
+      <a href="{% url 'show_building' building.id %}?meter_ids={{meter.id}}"
+        >{{meter.id}}: {{meter.fuel}}</a
+      >
+    </li>
+    {% endfor %}
+  </ul>
+  {%endfor%}
+</body>
